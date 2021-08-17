@@ -1,0 +1,4 @@
+# ignore al db files
+*.db
+make.txt
+venv/

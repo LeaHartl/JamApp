@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+
+{% block content %}
+    <h1>{% block title %} Pegel Ablesungen {% endblock %}</h1>
+    <h1>Hi, {{ current_user.username }}!</h1>
+{% with messages = get_flashed_messages() %}
+  {% if messages %}
+    <ul class=flashes>
+    {% for message in messages %}
+      <li><h2>{{ message }}<h2></li>
+    {% endfor %}
+    </ul>
+  {% endif %}
+{% endwith %}
+
+<h4>Neuer Pegel:</h4>
+    <form action="" method="post" novalidate>
+        {{ form.hidden_tag() }}
+       <table class="table">
+            <thead>
+                <tr>
+                    <th>Pegel Name</th>
+                    <th>Bohrdatum</th>
+                    <th>Lon</th>
+                    <th>Lat</th>
+                    <th>Kommentar</th>
+                </tr>
+            </thead>
+
+        <td name=form.stake_id.label>{{ form.stake_id }}            
+            {% for error in form.stake_id.errors %}
+            <span style="color: red;">[{{ error }}]</span>
+            {% endfor %}</td>
+
+        <td name=form.date.label>{{ form.drilldate }}
+            {% for error in form.drilldate.errors %}<span style="color: red;">[{{ error }}]</span>{% endfor %}</td>
+
+        <td name=form.FE.label>{{ form.x }}            
+            {% for error in form.x.errors %}
+            <span style="color: red;">[{{ error }}]</span>
+            {% endfor %}</td>
+
+        <td name=form.FE_new.label>{{ form.y }}            
+            {% for error in form.y.errors %}
+            <span style="color: red;">[{{ error }}]</span>
+            {% endfor %}</td>
+
+        <td name=form.comment.label>{{ form.comment }} 
+            {% for error in form.comment.errors %}
+            <span style="color: red;">[{{ error }}]</span>
+            {% endfor %}</td>
+           
+        </br>
+
+    </table>
+    <p>{{ form.submit() }}</p>
+    </form>
+
+
+{% endblock %}

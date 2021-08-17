@@ -1,0 +1,28 @@
+{% from "_formhelpers.html" import render_input %}
+
+{% extends "base.html" %}
+{% block body %}
+<h2>Hi {{ current_user.username }}, hello:</h2>
+
+  <form action="/input" method="post">
+    <table>
+      <tr>
+        <th>Pegel Name</th>
+        <th>Datum</th>
+        <th>FE</th>
+        <th>FE neu</th>
+        <th>Kommentar</th>
+
+      </tr>
+      {% for e in entries %}
+      <tr>
+        <td>{{e['stake_id']}}</td>
+        <!-- <td>{{e['id']}}</td> -->
+        <td>{{ render_input(e['stake_id'], e['date'], e['FE'], e['FE_new'], e['comment']) }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    <button type="submit">Send</button>
+  </form>
+
+{% endblock %}

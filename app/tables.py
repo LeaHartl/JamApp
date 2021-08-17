@@ -33,7 +33,10 @@ class StakeTable(Table):
     drilldate = DatetimeCol('Bohratum', datetime_format="YYYY-MM-dd")
     x = Col('Lon', allow_sort=False)
     y = Col('Lat', allow_sort=False)
+    abl_since_drilled = Col('Ablation seit Bohrdatum', allow_sort=False)
     comment = Col('Kommentar')
     who = Col('wer?')
     edit = LinkCol('Edit', 'editStake', url_kwargs=dict(id='id'), allow_sort=False)
     delete = LinkCol('Delete', 'deleteStake', url_kwargs=dict(id='id'), allow_sort=False)
+
+

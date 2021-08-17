@@ -67,6 +67,37 @@ def updateAblSeasonCol(stk):
         db.session.commit()
 
 
+def sincedrilldate(stk):
+        print(stk)
+        abl = [e.abl_since_last for e in Entry.query.filter(Entry.stake_id == stk).all()]
+        entrydate = [e.date for e in Entry.query.filter(Entry.stake_id == stk).all()]
+        ids = [e.id for e in Entry.query.filter(Entry.stake_id == stk).all()]
+
+        abl_df = pd.DataFrame(
+                {'ids': ids,
+                 'abl': abl,
+                 }, index=entrydate)
+
+        # print(abl_df)
+        d_d = Stake.query.filter(Stake.stake_id == stk).first()
+        # print('hello', d_d)
+        d_date = d_d.drilldate
+        # print(d_date)
+        e_date = abl_df.index.max()
+        # print(e_date)
+
+        # print(entrydate)
+        abl_df = abl_df.loc[d_date:e_date]
+
+        abl_value = abl_df['abl'].sum()
+        print('value: ', abl_value)
+
+        u_stake = db.session.query(Stake).filter(Stake.stake_id == stk).one()
+        u_stake.abl_since_drilled = abl_value
+
+        db.session.commit()
+
+
 @app.route('/')
 @app.route('/index')
 def index():
@@ -76,12 +107,21 @@ def index():
 @app.route('/stakes')
 def stakes():
     stk = Stake.query.all()
-
     table = StakeTable(stk)
     table.border = True
+    for s in stk:
+        sincedrilldate(s.stake_id)
     # print(table.__html__())
     return render_template('stakes.html', table=table)
 
+# @app.route('/stakes_update')
+# def stakesreload():
+#     stk = Stake.query.all()
+#     for s in stk:
+#         sincedrilldate(s.stake_id)
+#     table = StakeTable(stk)
+#     table.border = True
+#     return render_template('stakes.html', table=table)
 
 @app.route('/search_entries', methods=['GET', 'POST'])
 def search_entries():  
@@ -122,6 +162,7 @@ def new_entries():
     return render_template("entry1.html", title='Home Page', form=form,
                            entries=new_entries)
 
+
 @app.route('/new_stakes', methods=['GET', 'POST'])
 @login_required
 def new_stakes():
@@ -130,7 +171,7 @@ def new_stakes():
         oldid = db.session.query(Stake).order_by(desc('id')).first()
         newid = oldid.id+1
 
-        stake = Stake(drilldate=form.date.data, stake_id=form.stake_id.data,
+        stake = Stake(drilldate=form.drilldate.data, stake_id=form.stake_id.data,
                       x=form.x.data, y=form.y.data,
                       comment=form.comment.data, who=current_user.username,
                       id=newid)
@@ -227,6 +268,7 @@ def editStake(id):
         db.session.commit()
 
         flash('stake updated successfully!')
+        sincedrilldate(stk)
 
         results = Stake.query.all()
         table = Results(results)

@@ -36,15 +36,10 @@ class Stake(db.Model):
     drilldate = db.Column(db.DateTime)
     comment = db.Column(db.String)
     who = db.Column(db.String)
-    # asdf=db.Column(db.Float)
+    abl_since_drilled = db.Column(db.Float)
 
 
 class Entry(db.Model):
-    # def abl_oct(context):
-    #     Entry.query.with_entities(func.sum(Entry.abl_since_last).label("mySum")).filter(
-    #         Entry.date.between(str(yr-1)+'-10-01', form.date.data)).first().mySum
-    #     return context.get_current_parameters()[''] + 12
-
     __tablename__ = 'entries'
     id = db.Column(db.Integer, primary_key=True, index=True)
     stake_id = db.Column(db.String,  db.ForeignKey('stakes.stake_id'))
@@ -56,18 +51,3 @@ class Entry(db.Model):
     who = db.Column(db.String)
     abl_since_last = db.Column(db.Float)
     abl_since_oct = db.Column(db.Float)
-    abl_since_drilled = db.Column(db.Float)
-
-
-
-
-    #user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-
-    # def __repr__(self):
-    #     return '<Entry {}>'.format(self.body)
-
-
-
-    # def __repr__(self):
-    #     return '<Entry {}>'.format(self.body)
-

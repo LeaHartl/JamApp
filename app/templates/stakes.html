@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 
 {% block content %}
-    <h1>{% block title %} Welcome to FlaskBlog {% endblock %}</h1>
+    <h1>{% block title %} Welcome to Jamtal {% endblock %}</h1>
     <h1>Hi, {{ current_user.username }}!</h1>
 
 {% with messages = get_flashed_messages() %}
@@ -15,6 +15,10 @@
 {% endwith %}
 
     <a href="{{ url_for('.new_stakes') }}"> Neuen Pegel eingeben </a>
+     </br>
+    <!-- <a href="{{ url_for('.stakes') }}"> Neu laden </a> -->
+     </br>
+
 
 <title>Ablation stakes</title>
 {{ table }}

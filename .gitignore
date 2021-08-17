@@ -2,3 +2,4 @@
 *.db
 make.txt
 venv/
+migrations/

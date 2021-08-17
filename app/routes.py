@@ -88,8 +88,11 @@ def sincedrilldate(stk):
 
         # print(entrydate)
         abl_df = abl_df.loc[d_date:e_date]
-
-        abl_value = abl_df['abl'].sum()
+        abl_df2 = abl_df.iloc[1:,:]
+        print(abl_df)
+        print(abl_df2)
+        # print(abl_df.shift())
+        abl_value = abl_df2['abl'].sum()
         print('value: ', abl_value)
 
         u_stake = db.session.query(Stake).filter(Stake.stake_id == stk).one()

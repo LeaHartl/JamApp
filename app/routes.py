@@ -1,13 +1,14 @@
-from flask import render_template, flash, redirect, url_for, request
+from flask import render_template, flash, redirect, url_for, request, Response
 from app import app, db
 from app.forms import LoginForm, RegistrationForm, EntryForm, EntrySearchForm, StakeForm
 from app.tables import Results, StakeTable
 from flask_login import current_user, login_user, logout_user, login_required
 from app.models import User, Entry, Stake
 from werkzeug.urls import url_parse
-from sqlalchemy import desc, func, case
+from sqlalchemy import desc, func, case, and_
 from datetime import datetime
 import pandas as pd
+
 
 
 
@@ -107,6 +108,48 @@ def index():
     return render_template('index.html', title='Home')  # , user=user)
 
 
+@app.route('/lastentries')
+def lastentries():
+    now = datetime.now()
+
+    latest = db.session.query(Entry, func.max(Entry.date)).\
+        group_by(Entry.stake_id).order_by(Entry.date)
+
+    output = [item[0] for item in latest]
+    outputdf = pd.DataFrame(columns=['stake_id', 'date', 'FE'])
+
+    outputdf['stake_id'] = [out.stake_id for out in output]
+    # outputdf['drilldate'] = [out.drilldate for out in output]
+    # outputdf['abl_since_drilled'] = [out.abl_since_drilled for out in output]
+    outputdf['FE'] = [out.FE_new for out in output]
+    outputdf['date'] = [out.date for out in output]
+    # outputdf['comment'] = [out.comment for out in output]
+
+    if not latest:
+        flash('No results found!')
+        return redirect('/')
+    else:
+        table = Results(output)
+        table.border = True
+        return render_template('lastentries.html', table=table, output=outputdf)
+
+@app.route('/getcsv')
+def getcsv():
+    print('hello')
+    output = request.args.get('pass', None)
+    # print(output)
+    # print(type(output))
+    # cdv=pd.DataFrame(output)
+    # print(cdv)
+    return Response(
+        output,
+        mimetype="text/csv",
+        headers={"Content-disposition":
+                 "attachment; filename=lastentries.csv"})
+
+    return redirect('/')
+
+
 @app.route('/stakes')
 def stakes():
     stk = Stake.query.all()
@@ -117,17 +160,9 @@ def stakes():
     # print(table.__html__())
     return render_template('stakes.html', table=table)
 
-# @app.route('/stakes_update')
-# def stakesreload():
-#     stk = Stake.query.all()
-#     for s in stk:
-#         sincedrilldate(s.stake_id)
-#     table = StakeTable(stk)
-#     table.border = True
-#     return render_template('stakes.html', table=table)
 
 @app.route('/search_entries', methods=['GET', 'POST'])
-def search_entries():  
+def search_entries(): 
     search = EntrySearchForm(request.form)
     if request.method == 'POST':
         # session['search'] = search

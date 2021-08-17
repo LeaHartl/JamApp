@@ -2,7 +2,7 @@
 
 {% block content %}
     <h1>{% block title %} Welcome to Jamtal {% endblock %}</h1>
-    <h1>Hi, {{ current_user.username }}!</h1>
+    <h1>Hi {{ current_user.username }}!</h1>
 
 {% with messages = get_flashed_messages() %}
   {% if messages %}

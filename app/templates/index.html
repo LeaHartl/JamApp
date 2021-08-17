@@ -1,10 +1,14 @@
 {% extends 'base.html' %}
 
 {% block content %}
-    <h1>{% block title %} Welcome to Jamtalferner Data Entry {% endblock %}</h1>
-    <h1>Hi, {{ current_user.username }}!</h1>
+    <h1>{% block title %} Wilkommen im Jamtal {% endblock %}</h1>
+    <h1>Hi {{ current_user.username }}!</h1>
 
     <h2>This is the landing page</h2>
+</br>
+    <a href="{{ url_for('lastentries') }}">Pegeldaten: letzte Ablesung</a>
+    <\br>
+    <a href="{{ url_for('stakes') }}">Pegeldaten: Positionen und Bohrdatum</a>
 
 
 

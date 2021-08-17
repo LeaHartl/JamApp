@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+
+{% block content %}
+    <h1>{% block title %} Zuletzt eingetragene Pegelwerte: {% endblock %}</h1>
+
+{{ table }}
+
+
+        <!-- Hello. <a href="/getPlotCSV">Click me.</a> -->
+
+<a href="{{ url_for('getcsv', pass=output) }}">Download values as csv</a>
+
+
+
+{% endblock %}

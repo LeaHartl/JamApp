@@ -1,7 +1,7 @@
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, BooleanField, SubmitField, SelectField, FloatField, DateField
 from wtforms.ext.sqlalchemy.fields import QuerySelectField
-from wtforms.validators import ValidationError, DataRequired, Email, EqualTo
+from wtforms.validators import ValidationError, DataRequired, InputRequired, Email, EqualTo
 from app.models import User, Stake, Entry
 from datetime import datetime
 
@@ -40,8 +40,8 @@ class EntryForm(FlaskForm):
         return stks
 
     date = DateField('Ablesedatum', format='%Y-%m-%d', default=datetime.now(), validators=[DataRequired()])
-    FE = FloatField('Freies Ende', validators=[DataRequired()])
-    FE_new = FloatField('Freies Ende Neu', validators=[DataRequired()])
+    FE = FloatField('Freies Ende', validators=[InputRequired()])
+    FE_new = FloatField('Freies Ende Neu', validators=[InputRequired()])
     # who = StringField('Wer gibt die Daten ein?')
     comment = StringField('Kommentar')
     stake_id = SelectField('Pegel Name', choices=stake_choices())

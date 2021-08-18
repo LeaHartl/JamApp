@@ -2,25 +2,25 @@
 
 {% block content %}
     <h1>{% block title %} Pegel Ablesungen {% endblock %}</h1>
-    <h1>Hi, {{ current_user.username }}!</h1>
+    <h1>Hi {{ current_user.username }}!</h1>
 
-<a href="{{ url_for('.new_entries') }}"> Neue Ablesungen eintragen </a>
+
 
 {% with messages = get_flashed_messages() %}
   {% if messages %}
     <ul class=flashes>
     {% for message in messages %}
-      <li><h2>{{ message }}<h2></li>
+      <li><h3>{{ message }}</h3></li>
     {% endfor %}
     </ul>
   {% endif %}
 {% endwith %}
 
+<h2><a href="{{ url_for('.new_entries') }}"> Neue Ablesungen eintragen </a></h2>
+
 
 {% from "_formhelpers.html" import render_field %}
 
-
-<form method="post">
   <dl>
     {#{ render_field(form.select) }#}
     <p>
@@ -28,9 +28,11 @@
   </p></dl>
   <p><input type="submit" value="Search">
 
-</p></form>
+  </p></form>
 
-<title>Search Results - Flask Music Database</title>
-{{ table }}
-
-{% endblock %}
+    <title>Search Results</title>
+    {{ table }}
+    {% if table%}
+      <a href="{{ url_for('getcsvstakes', stk = stk) }}">Download as csv</a>
+    {% endif %}
+  {% endblock %}

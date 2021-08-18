@@ -10,12 +10,10 @@ from datetime import datetime
 import pandas as pd
 
 
-
-
 def updateAblCol(stk):
-        FEs = [e.FE for e in Entry.query.filter(Entry.stake_id == stk).all()]
-        FE_news = [e.FE_new for e in Entry.query.filter(Entry.stake_id == stk).all()]
-        ids = [e.id for e in Entry.query.filter(Entry.stake_id == stk).all()]
+        FEs = [e.FE for e in Entry.query.filter(Entry.stake_id == stk).order_by(Entry.date).all()]
+        FE_news = [e.FE_new for e in Entry.query.filter(Entry.stake_id == stk).order_by(Entry.date).all()]
+        ids = [e.id for e in Entry.query.filter(Entry.stake_id == stk).order_by(Entry.date).all()]
 
         FE_df = pd.DataFrame(
                 {'FE': FEs,
@@ -35,71 +33,62 @@ def updateAblCol(stk):
 
 
 def updateAblSeasonCol(stk):
-        abl = [e.abl_since_last for e in Entry.query.filter(Entry.stake_id == stk).all()]
-        entrydate = [e.date for e in Entry.query.filter(Entry.stake_id == stk).all()]
-        ids = [e.id for e in Entry.query.filter(Entry.stake_id == stk).all()]
+    abl = [e.abl_since_last for e in Entry.query.filter(Entry.stake_id == stk).order_by(Entry.date).all()]
+    entrydate = [e.date for e in Entry.query.filter(Entry.stake_id == stk).order_by(Entry.date).all()]
+    ids = [e.id for e in Entry.query.filter(Entry.stake_id == stk).order_by(Entry.date).all()]
 
-        abl_df = pd.DataFrame(
-                {'ids': ids,
-                 'abl': abl,
-                 }, index=entrydate)
+    abl_df = pd.DataFrame(
+            {'ids': ids,
+             'abl': abl,
+             }, index=entrydate)
 
-        now = datetime.now()
-        yr = now.year
+    now = datetime.now()
+    yr = now.year
 
-        # print(entrydate)
+    # print(entrydate)
 
-        df_1 = abl_df.groupby(abl_df.index.year)['abl'].cumsum()
+    df_1 = abl_df.groupby(abl_df.index.year)['abl'].cumsum()
 
-        abl_df['cumsum'] = abl_df['abl'].cumsum()
-        abl_df['sumAbl'] = df_1.values
-        abl_df['entrydate'] = abl_df.index
+    abl_df['cumsum'] = abl_df['abl'].cumsum()
+    abl_df['sumAbl'] = df_1.values
+    abl_df['entrydate'] = abl_df.index
 
-        # print('test', abl_df)
-        abl_df.set_index('ids', inplace=True)
-        # print(abl_df)
-        dct = abl_df['sumAbl'].to_dict()
+    # print('test', abl_df)
+    abl_df.set_index('ids', inplace=True)
+    # print(abl_df)
+    dct = abl_df['sumAbl'].to_dict()
 
-        db.session.query(Entry).filter(
-            Entry.id.in_(dct)).update(
-            {Entry.abl_since_oct: case(dct, value=Entry.id)},
-            synchronize_session=False)
+    db.session.query(Entry).filter(
+        Entry.id.in_(dct)).update(
+        {Entry.abl_since_oct: case(dct, value=Entry.id)},
+        synchronize_session=False)
 
-        db.session.commit()
+    db.session.commit()
 
 
 def sincedrilldate(stk):
-        print(stk)
-        abl = [e.abl_since_last for e in Entry.query.filter(Entry.stake_id == stk).all()]
-        entrydate = [e.date for e in Entry.query.filter(Entry.stake_id == stk).all()]
-        ids = [e.id for e in Entry.query.filter(Entry.stake_id == stk).all()]
+    abl = [e.abl_since_last for e in Entry.query.filter(Entry.stake_id == stk).order_by(Entry.date).all()]
+    entrydate = [e.date for e in Entry.query.filter(Entry.stake_id == stk).order_by(Entry.date).all()]
+    ids = [e.id for e in Entry.query.filter(Entry.stake_id == stk).order_by(Entry.date).all()]
 
-        abl_df = pd.DataFrame(
-                {'ids': ids,
-                 'abl': abl,
-                 }, index=entrydate)
+    abl_df = pd.DataFrame(
+            {'ids': ids,
+             'abl': abl,
+             }, index=entrydate)
 
-        # print(abl_df)
-        d_d = Stake.query.filter(Stake.stake_id == stk).first()
-        # print('hello', d_d)
-        d_date = d_d.drilldate
-        # print(d_date)
-        e_date = abl_df.index.max()
-        # print(e_date)
+    d_d = Stake.query.filter(Stake.stake_id == stk).first()
+    d_date = d_d.drilldate
+    e_date = abl_df.index.max()
 
-        # print(entrydate)
-        abl_df = abl_df.loc[d_date:e_date]
-        abl_df2 = abl_df.iloc[1:,:]
-        print(abl_df)
-        print(abl_df2)
-        # print(abl_df.shift())
-        abl_value = abl_df2['abl'].sum()
-        print('value: ', abl_value)
+    abl_df = abl_df.loc[d_date:e_date]
+    abl_df2 = abl_df.iloc[1:, :]
+    abl_value = abl_df2['abl'].sum()
+    # print('value: ', abl_value)
 
-        u_stake = db.session.query(Stake).filter(Stake.stake_id == stk).one()
-        u_stake.abl_since_drilled = abl_value
+    u_stake = db.session.query(Stake).filter(Stake.stake_id == stk).one()
+    u_stake.abl_since_drilled = abl_value
 
-        db.session.commit()
+    db.session.commit()
 
 
 @app.route('/')
@@ -133,6 +122,7 @@ def lastentries():
         table.border = True
         return render_template('lastentries.html', table=table, output=outputdf)
 
+
 @app.route('/getcsv')
 def getcsv():
     print('hello')
@@ -146,7 +136,6 @@ def getcsv():
         mimetype="text/csv",
         headers={"Content-disposition":
                  "attachment; filename=lastentries.csv"})
-
     return redirect('/')
 
 
@@ -162,14 +151,31 @@ def stakes():
 
 
 @app.route('/search_entries', methods=['GET', 'POST'])
-def search_entries(): 
+def search_entries():
     search = EntrySearchForm(request.form)
     if request.method == 'POST':
-        # session['search'] = search
-        # print('hello')
+
         return search_results(search)
+    # print(stk)
 
     return render_template('search_entries.html', form=search)
+
+
+@app.route('/getcsvstakes')
+def getcsvstakes():
+    stk = request.args.get('stk', None)
+    data = Entry.query.filter(Entry.stake_id == stk).all()
+    outputdf = pd.DataFrame([(d.stake_id, d.date, d.FE, d.FE_new, d.comment,
+                              d.abl_since_last, d.abl_since_oct) for d in data],
+                            columns=['stake_id', 'date', 'FE', 'FE neu', 'Kommentar',
+                            'Ablation seit letzter Messung', 'Abl. seit Herbst'])
+    return Response(
+        outputdf.to_csv(),
+        mimetype="text/csv",
+        headers={"Content-disposition":
+                 "attachment; filename=Pegelblatt_P"+stk+".csv"})
+    return redirect('/')
+
 
 
 @app.route('/new_entries', methods=['GET', 'POST'])
@@ -232,10 +238,10 @@ def new_stakes():
 def search_results(search):
     #form = EntrySearchForm()
     stk = search.data['search']
-    print(stk)
+    # print(stk)
 
-    results = Entry.query.filter(Entry.stake_id == stk).all()
-    print(results)
+    results = Entry.query.filter(Entry.stake_id == stk).order_by(Entry.date).all()
+    # print(results)
     if not results:
         flash('No results found!')
         return redirect('/')
@@ -249,7 +255,7 @@ def search_results(search):
                         # sort_reverse=reverse)
                         # search=search)
         table.border = True
-        return render_template('search_entries.html', table=table, form=search)
+        return render_template('search_entries.html', table=table, form=search, stk=stk)
 
 
 @app.route('/entry/<int:id>', methods=['GET', 'POST'])

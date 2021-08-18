@@ -8,6 +8,78 @@ from werkzeug.urls import url_parse
 from sqlalchemy import desc, func, case, and_
 from datetime import datetime
 import pandas as pd
+import numpy as np
+
+from bokeh.plotting import figure, show, output_notebook
+from bokeh.models import Slider, CheckboxGroup, CustomJS, ColumnDataSource, CDSView
+from bokeh.models.filters import CustomJSFilter
+from bokeh.layouts import row
+from bokeh.transform import factor_cmap
+from bokeh.palettes import Category10_10
+from bokeh.embed import components
+from bokeh.resources import INLINE
+
+import matplotlib.pylab as pl
+import matplotlib
+
+
+from bokeh.embed import server_document
+
+@app.route('/plot', methods=['GET'])
+def plot():
+    def getsource():
+        data = Entry.query.all()
+        outputdf = pd.DataFrame([(d.stake_id, d.date, d.FE, d.FE_new, d.comment,
+                                d.abl_since_last, d.abl_since_oct) for d in data],
+                                columns=['stake_id', 'date', 'FE', 'FE_new', 'comment',
+                                'abl_since_last', 'abl_since_oct'])
+        return (outputdf)
+
+    df = getsource()
+    df['color'] = ''
+
+    ## works more or less but sorting does not do what i want it to.
+    checks = df['stake_id'].drop_duplicates().sort_values().tolist()
+    n = len(checks)
+    colors = pl.cm.nipy_spectral(np.linspace(0, 1, n))
+
+    for i, c in enumerate(checks):
+        df.loc[df['stake_id'] == c, 'color'] = matplotlib.colors.to_hex(colors[i])
+
+    source = ColumnDataSource(df)
+    checkboxes = CheckboxGroup(labels=checks, active=list(range(len(checks))))
+
+    fig = figure(plot_height=600, plot_width=720,
+                  tooltips=[("Ablation seit Herbst (cm Eis)", "@abl_since_oct"), ("Datum", "@date")],  #, ("Pegel", "@stake_id")],
+                  x_axis_type='datetime')
+
+    filter = CustomJSFilter(code="""
+let selected = checkboxes.active.map(i=>checkboxes.labels[i]);
+let indices = [];
+let column = source.data['stake_id'];
+for(let i=0; i<column.length; i++){
+    if(selected.includes(column[i])){
+        indices.push(i);
+    }
+}
+return indices;
+""", args=dict(checkboxes=checkboxes))
+
+    checkboxes.js_on_change("active", CustomJS(code="source.change.emit();", args=dict(source=source)))
+
+    p = fig.circle(x="date", y="abl_since_oct", source=source,view=CDSView(source=source, filters=[filter]), size=5, fill_color='color', line_color=None )
+
+    layout = row(checkboxes, fig)
+    script, div = components(layout)
+    # script, div = components(fig)
+
+    return render_template(
+        'embed.html',
+        plot_script=script,
+        plot_div=div,
+        js_resources=INLINE.render_js(),
+        css_resources=INLINE.render_css(),
+        ).encode(encoding='UTF-8')
 
 
 def updateAblCol(stk):

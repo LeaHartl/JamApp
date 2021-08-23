@@ -6,72 +6,19 @@ from flask_login import current_user, login_user, logout_user, login_required
 from app.models import User, Entry, Stake
 from werkzeug.urls import url_parse
 from sqlalchemy import desc, func, case, and_
-from datetime import datetime
+# from datetime import datetime
 import pandas as pd
-import numpy as np
 
-from bokeh.plotting import figure, show, output_notebook
-from bokeh.models import Slider, CheckboxGroup, CustomJS, ColumnDataSource, CDSView
-from bokeh.models.filters import CustomJSFilter
-from bokeh.layouts import row
-from bokeh.transform import factor_cmap
-from bokeh.palettes import Category10_10
 from bokeh.embed import components
 from bokeh.resources import INLINE
 
-import matplotlib.pylab as pl
-import matplotlib
+import app.bokeh_embed as be
+import app.helpers as hlp
 
-
-from bokeh.embed import server_document
 
 @app.route('/plot', methods=['GET'])
 def plot():
-    def getsource():
-        data = Entry.query.all()
-        outputdf = pd.DataFrame([(d.stake_id, d.date, d.FE, d.FE_new, d.comment,
-                                d.abl_since_last, d.abl_since_oct) for d in data],
-                                columns=['stake_id', 'date', 'FE', 'FE_new', 'comment',
-                                'abl_since_last', 'abl_since_oct'])
-        return (outputdf)
-
-    df = getsource()
-    df['color'] = ''
-
-    ## works more or less but sorting does not do what i want it to.
-    checks = df['stake_id'].drop_duplicates().sort_values().tolist()
-    n = len(checks)
-    colors = pl.cm.nipy_spectral(np.linspace(0, 1, n))
-
-    for i, c in enumerate(checks):
-        df.loc[df['stake_id'] == c, 'color'] = matplotlib.colors.to_hex(colors[i])
-
-    source = ColumnDataSource(df)
-    checkboxes = CheckboxGroup(labels=checks, active=list(range(len(checks))))
-
-    fig = figure(plot_height=600, plot_width=720,
-                  tooltips=[("Ablation seit Herbst (cm Eis)", "@abl_since_oct"), ("Datum", "@date")],  #, ("Pegel", "@stake_id")],
-                  x_axis_type='datetime')
-
-    filter = CustomJSFilter(code="""
-let selected = checkboxes.active.map(i=>checkboxes.labels[i]);
-let indices = [];
-let column = source.data['stake_id'];
-for(let i=0; i<column.length; i++){
-    if(selected.includes(column[i])){
-        indices.push(i);
-    }
-}
-return indices;
-""", args=dict(checkboxes=checkboxes))
-
-    checkboxes.js_on_change("active", CustomJS(code="source.change.emit();", args=dict(source=source)))
-
-    p = fig.circle(x="date", y="abl_since_oct", source=source,view=CDSView(source=source, filters=[filter]), size=5, fill_color='color', line_color=None )
-
-    layout = row(checkboxes, fig)
-    script, div = components(layout)
-    # script, div = components(fig)
+    script, div = components(be.pointplot())
 
     return render_template(
         'embed.html',
@@ -82,91 +29,19 @@ return indices;
         ).encode(encoding='UTF-8')
 
 
-def updateAblCol(stk):
-        FEs = [e.FE for e in Entry.query.filter(Entry.stake_id == stk).order_by(Entry.date).all()]
-        FE_news = [e.FE_new for e in Entry.query.filter(Entry.stake_id == stk).order_by(Entry.date).all()]
-        ids = [e.id for e in Entry.query.filter(Entry.stake_id == stk).order_by(Entry.date).all()]
-
-        FE_df = pd.DataFrame(
-                {'FE': FEs,
-                 'FE_new': FE_news,
-                 }, index=ids)
-        FE_df['abl'] = FE_df['FE'] - FE_df['FE_new'].shift(1)
-        # print(FE_df)
-        dct = FE_df['abl'].to_dict()
-        # print(dct)
-
-        db.session.query(Entry).filter(
-            Entry.id.in_(dct)).update(
-            {Entry.abl_since_last: case(dct, value=Entry.id)},
-            synchronize_session=False)
-
-        db.session.commit()
-
-
-def updateAblSeasonCol(stk):
-    abl = [e.abl_since_last for e in Entry.query.filter(Entry.stake_id == stk).order_by(Entry.date).all()]
-    entrydate = [e.date for e in Entry.query.filter(Entry.stake_id == stk).order_by(Entry.date).all()]
-    ids = [e.id for e in Entry.query.filter(Entry.stake_id == stk).order_by(Entry.date).all()]
-
-    abl_df = pd.DataFrame(
-            {'ids': ids,
-             'abl': abl,
-             }, index=entrydate)
-
-    now = datetime.now()
-    yr = now.year
-
-    # print(entrydate)
-
-    df_1 = abl_df.groupby(abl_df.index.year)['abl'].cumsum()
-
-    abl_df['cumsum'] = abl_df['abl'].cumsum()
-    abl_df['sumAbl'] = df_1.values
-    abl_df['entrydate'] = abl_df.index
-
-    # print('test', abl_df)
-    abl_df.set_index('ids', inplace=True)
-    # print(abl_df)
-    dct = abl_df['sumAbl'].to_dict()
-
-    db.session.query(Entry).filter(
-        Entry.id.in_(dct)).update(
-        {Entry.abl_since_oct: case(dct, value=Entry.id)},
-        synchronize_session=False)
-
-    db.session.commit()
-
-
-def sincedrilldate(stk):
-    abl = [e.abl_since_last for e in Entry.query.filter(Entry.stake_id == stk).order_by(Entry.date).all()]
-    entrydate = [e.date for e in Entry.query.filter(Entry.stake_id == stk).order_by(Entry.date).all()]
-    ids = [e.id for e in Entry.query.filter(Entry.stake_id == stk).order_by(Entry.date).all()]
-
-    abl_df = pd.DataFrame(
-            {'ids': ids,
-             'abl': abl,
-             }, index=entrydate)
-
-    d_d = Stake.query.filter(Stake.stake_id == stk).first()
-    d_date = d_d.drilldate
-    e_date = abl_df.index.max()
-
-    abl_df = abl_df.loc[d_date:e_date]
-    abl_df2 = abl_df.iloc[1:, :]
-    abl_value = abl_df2['abl'].sum()
-    # print('value: ', abl_value)
-
-    u_stake = db.session.query(Stake).filter(Stake.stake_id == stk).one()
-    u_stake.abl_since_drilled = abl_value
-
-    db.session.commit()
-
-
 @app.route('/')
 @app.route('/index')
 def index():
-    return render_template('index.html', title='Home')  # , user=user)
+    script, div = components(be.mapplot())
+
+    return render_template(
+        'index.html',
+        plot_script=script,
+        plot_div=div,
+        js_resources=INLINE.render_js(),
+        css_resources=INLINE.render_css(),
+        ).encode(encoding='UTF-8')
+    return render_template('index.html', title='Home')  
 
 
 @app.route('/lastentries')
@@ -217,7 +92,7 @@ def stakes():
     table = StakeTable(stk)
     table.border = True
     for s in stk:
-        sincedrilldate(s.stake_id)
+        hlp.sincedrilldate(s.stake_id)
     # print(table.__html__())
     return render_template('stakes.html', table=table)
 
@@ -269,8 +144,8 @@ def new_entries():
         db.session.add(entry)
         db.session.commit()
 
-        updateAblCol(form.stake_id.data)
-        updateAblSeasonCol(form.stake_id.data)
+        hlp.updateAblCol(form.stake_id.data)
+        hlp.updateAblSeasonCol(form.stake_id.data)
 
         flash('Ablesung gespeichert!')
         return redirect(url_for('search_entries'))
@@ -281,6 +156,7 @@ def new_entries():
 
 @app.route('/new_stakes', methods=['GET', 'POST'])
 @login_required
+## FIND WAY TO CHECK FOR DUPLICATE STAKE NAME ENTRIES!
 def new_stakes():
     form = StakeForm()
     if form.validate_on_submit():
@@ -350,8 +226,8 @@ def editEntry(id):
         db.session.merge(entry)
         db.session.commit()
 
-        updateAblCol(form.stake_id.data)
-        updateAblSeasonCol(form.stake_id.data)
+        hlp.updateAblCol(form.stake_id.data)
+        hlp.updateAblSeasonCol(form.stake_id.data)
 
         flash('entry updated successfully!')
 
@@ -384,7 +260,7 @@ def editStake(id):
         db.session.commit()
 
         flash('stake updated successfully!')
-        sincedrilldate(stk)
+        hlp.sincedrilldate(stk)
 
         results = Stake.query.all()
         table = Results(results)
@@ -406,15 +282,16 @@ def deleteEntry(id):
     db.session.delete(entry)
     db.session.commit()
 
-    updateAblCol(stk)
-    updateAblSeasonCol(stk)
+    hlp.updateAblCol(stk)
+    hlp.updateAblSeasonCol(stk)
 
     flash('entry deleted successfully!')
 
     results = Entry.query.filter(Entry.stake_id == stk).all()
     table = Results(results)
     table.border = True
-    return render_template('search_entries.html', table=table, form=search)
+    return redirect(url_for('search_entries'))
+    # return render_template('search_entries.html', table=table, form=search)
 
 
 # delete a stake

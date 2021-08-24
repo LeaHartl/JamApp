@@ -221,6 +221,7 @@ def search_results(search):
 
 
 @app.route('/entry/<int:id>', methods=['GET', 'POST'])
+@login_required
 def editEntry(id):
     qry = Entry.query.filter(Entry.id == id)
     entry = qry.first()
@@ -253,6 +254,7 @@ def editEntry(id):
     return render_template('edit_entry.html', form=form)
 
 @app.route('/stake/<int:id>', methods=['GET', 'POST'])
+@login_required
 def editStake(id):
     # return render_template('index.html')#, form=form)
     qry = Stake.query.filter(Stake.id == id)
@@ -285,6 +287,7 @@ def editStake(id):
 
 # delete an entry
 @app.route('/delentry/<int:id>', methods=['GET', 'POST'])
+@login_required
 def deleteEntry(id):
     qry = Entry.query.filter(Entry.id == id)
     entry = qry.first()
@@ -310,6 +313,7 @@ def deleteEntry(id):
 
 # delete a stake
 @app.route('/delstake/<int:id>', methods=['GET', 'POST'])
+@login_required
 def deleteStake(id):
     qry = Stake.query.filter(Stake.id == id)
     stake = qry.first()

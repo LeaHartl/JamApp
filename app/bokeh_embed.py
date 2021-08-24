@@ -166,6 +166,21 @@ def pointplot():
     source = ColumnDataSource(df)
     checkboxes = CheckboxGroup(labels=checks, active=[0, 21])#list(range(len(checks))))
 
+    lbls = pd.DataFrame(columns=['x', 'y', 'stake_id', 'color'])
+    lbls.stake_id = checks
+    lbls.y = [70+v*8 for v in range(len(checks))]
+    lbls.x = 70
+    for i, c in enumerate(checks):
+        lbls.loc[lbls['stake_id'] == c, 'color'] = matplotlib.colors.to_hex(colors[i])
+    # lbls.color = colors
+    print(lbls)
+    lsource = ColumnDataSource(lbls)
+    labels = LabelSet(x='x', y='y', x_units='screen', y_units='screen',
+                      text='stake_id',
+                      source=lsource, render_mode='canvas', text_font_size='10pt',
+                      x_offset=2, y_offset=-18,
+                      background_fill_color='color', background_fill_alpha=0.6)
+
     fig = figure(plot_height=600, plot_width=720,
                  x_axis_type='datetime')
 
@@ -177,46 +192,52 @@ def pointplot():
     let selected = checkboxes.active.map(i=>checkboxes.labels[i]);
     let indices = [];
     let column = source.data['stake_id'];
+    
     for(let i=0; i<column.length; i++){
         if(selected.includes(column[i])){
             indices.push(i);
             }
         }
+
     return indices;
     """, args=dict(checkboxes=checkboxes))
     
-    text='test'
-
-    citation=Label(x=70, y=70, x_units='screen', y_units='screen',
-                 text=text, render_mode='css',
-                 border_line_color='black', border_line_alpha=1.0,
-                 background_fill_color='white', background_fill_alpha=1.0)
+    # text='test'
 
 
+    # use this if not trying to change label text.
     checkboxes.js_on_change("active", CustomJS(code="source.change.emit();", args=dict(source=source)))
+#
+#ADAPT HERE TO UPDATE LABELGROUP ON CLICK:::
+    # # sel_list = [0, 21]
+    # checkboxes.js_on_change("active", CustomJS(code=""" 
+    #     var inds = cb_obj.indices;
+    #     var selected2 = checkboxes.active.map(i=>checkboxes.labels[i]);
+    #     var column2 = source.data['stake_id'];
+    #     sel_list = selected2
+    #     //console.log(selected2, inds);
 
-    ## not working. TRY TO MAKE LEGEND LIKE THIS...
-    checkboxes.js_on_change("active", CustomJS(code="""       
-        var inds = cb_obj.indices;
-        var selected2 = checkboxes.active.map(i=>checkboxes.labels[i]);
-        var column2 = source.data['stake_id'];
+    #     console.log(selected2);
+    #     labels.text = 'p'+selected2[0];
+    #     //citation.y = inds[0];
+    #     source.change.emit();
+    #     """,args=dict(source=source, citation=citation, checkboxes=checkboxes, sel_list=sel_list)))
+    # # print(sel_list)
+    # for v in sel_list:
+    #     citation = Label(x=70, y=70+v, x_units='screen', y_units='screen',
+    #                  text='p'+checks[v], render_mode='css',
+    #                  border_line_color='black', border_line_alpha=1.0,
+    #                  background_fill_color='white', background_fill_alpha=1.0)
+    #     print(citation.text)
+    #     fig.add_layout(citation)
 
-        for (var i = 0; i < inds.length; i++) {
-            if(selected2.includes(column2[i])){
-                text = column2[i];
-            }
-        }
-
-    """, args=dict(citation=citation)))
-
-    # fig.line(x="date", y="abl_since_oct", source=source, line_width=2,  view=CDSView(source=source, filters=[filter]))
     p = fig.circle(x="date", y="abl_since_oct", source=source,
                    view=CDSView(source=source, filters=[filter]),
                    size=5, fill_color='color', line_color=None,)
                    #legend_group='stake_id')
 
     # fig.add_layout(legend)
-    fig.add_layout(citation)
+    fig.add_layout(labels)
     layout = row(checkboxes, fig)
     return (layout)
 

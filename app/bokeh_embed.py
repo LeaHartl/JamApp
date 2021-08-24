@@ -1,11 +1,13 @@
 from bokeh.plotting import figure, show, output_notebook
-from bokeh.models import Slider, CheckboxGroup, CustomJS, ColumnDataSource, CDSView, HoverTool, Label, LabelSet, LinearColorMapper, ColorBar
+from bokeh.models import Scatter, Legend, LegendItem, CheckboxGroup, CheckboxButtonGroup, CustomJS, ColumnDataSource, CDSView, HoverTool, Label, LabelSet, LinearColorMapper, ColorBar
 from bokeh.models.filters import CustomJSFilter
-from bokeh.layouts import row
+from bokeh.layouts import row, column
 from bokeh.transform import factor_cmap
 from bokeh.palettes import Category10_10
 from bokeh.embed import components
 from bokeh.resources import INLINE
+from bokeh.core.enums import MarkerType
+# from bokeh.charts import Scatter
 
 import matplotlib.pylab as pl
 import matplotlib
@@ -14,6 +16,7 @@ import pandas as pd
 import numpy as np
 import geopandas as gpd
 from app.models import User, Stake, Entry
+
 
 def getPolyCoords(row, geom, coord_type):
     """Returns the coordinates ('x|y') of edges/vertices of a Polygon/others"""
@@ -161,7 +164,7 @@ def pointplot():
         df.loc[df['stake_id'] == c, 'color'] = matplotlib.colors.to_hex(colors[i])
 
     source = ColumnDataSource(df)
-    checkboxes = CheckboxGroup(labels=checks, active=[])#list(range(len(checks))))
+    checkboxes = CheckboxGroup(labels=checks, active=[0, 21])#list(range(len(checks))))
 
     fig = figure(plot_height=600, plot_width=720,
                  x_axis_type='datetime')
@@ -181,14 +184,167 @@ def pointplot():
         }
     return indices;
     """, args=dict(checkboxes=checkboxes))
+    
+    text='test'
+
+    citation=Label(x=70, y=70, x_units='screen', y_units='screen',
+                 text=text, render_mode='css',
+                 border_line_color='black', border_line_alpha=1.0,
+                 background_fill_color='white', background_fill_alpha=1.0)
+
 
     checkboxes.js_on_change("active", CustomJS(code="source.change.emit();", args=dict(source=source)))
 
-    # fig.line(x="date", y="abl_since_oct", source=source, line_width=2,  view=CDSView(source=source, filters=[filter]))
-    p = fig.circle(x="date", y="abl_since_oct", source=source, view=CDSView(source=source, filters=[filter]), size=5, fill_color='color', line_color=None )
+    ## not working. TRY TO MAKE LEGEND LIKE THIS...
+    checkboxes.js_on_change("active", CustomJS(code="""       
+        var inds = cb_obj.indices;
+        var selected2 = checkboxes.active.map(i=>checkboxes.labels[i]);
+        var column2 = source.data['stake_id'];
 
+        for (var i = 0; i < inds.length; i++) {
+            if(selected2.includes(column2[i])){
+                text = column2[i];
+            }
+        }
+
+    """, args=dict(citation=citation)))
+
+    # fig.line(x="date", y="abl_since_oct", source=source, line_width=2,  view=CDSView(source=source, filters=[filter]))
+    p = fig.circle(x="date", y="abl_since_oct", source=source,
+                   view=CDSView(source=source, filters=[filter]),
+                   size=5, fill_color='color', line_color=None,)
+                   #legend_group='stake_id')
+
+    # fig.add_layout(legend)
+    fig.add_layout(citation)
     layout = row(checkboxes, fig)
     return (layout)
 
 
+def pointplotbyyear():
+    df = getsource()
+    df['color'] = ''
+
+    # works more or less but sorting does not do what i want it to.
+    checks = df['stake_id'].drop_duplicates().sort_values().tolist()
+    yrs = df['date'].dt.year.drop_duplicates().sort_values().astype(str).tolist()
+    print(min(yrs))
+    n = len(checks)
+    colors = pl.cm.nipy_spectral(np.linspace(0, 1, n))
+    colors_yr = pl.cm.Accent(np.linspace(0, 1, len(yrs)))
+
+    # markers = list(MarkerType)
+    # markers = markers[0:len(yrs)+1]
+    markers = ['diamond', 'square', 'circle', 'triangle']
+
+    for i, c in enumerate(checks):
+        df.loc[df['stake_id'] == c, 'color'] = matplotlib.colors.to_hex(colors[i])
+
+    df2 = df.copy()
+
+    new_range = pd.date_range(start=min(yrs)+'-05-01', end=max(yrs)+'-10-31', freq='D' )
+    dic = {}
+    df3=pd.DataFrame()
+
+    ##resample maybe not needed, can be shortened.
+    for c in checks:
+        dic[c] = df2.loc[df['stake_id']==c]
+        dic[c].set_index('date', inplace=True)
+        dic[c].sort_index(inplace=True)
+        dic[c] = dic[c].resample('D').asfreq().reindex(new_range)
+        dic[c] = dic[c].loc[(dic[c].index.month >= 5) & (dic[c].index.month <= 10)]
+        dic[c] = dic[c][['stake_id', 'abl_since_oct', 'color']]
+        dic[c]['stake_id'] = c
+        dic[c]['year'] = dic[c].index.year.astype(str)
+        dic[c]['month'] = dic[c].index.month.astype(str)
+        dic[c]['day'] = dic[c].index.day.astype(str)
+        dic[c]['doy'] = dic[c].index.dayofyear
+        dic[c]['dummydate'] = '2020-'+dic[c]['month']+'-'+dic[c]['day']
+        dic[c]['dummydate'] = pd.to_datetime(dic[c]['dummydate'])
+        dic[c]['date'] = dic[c].index
+        dic[c].drop(['day', 'month'], axis=1, inplace=True)
+
+        df3 = pd.concat([df3, dic[c]])
+        #dic[c] = dic[c].set_index(['year', 'date']).abl_since_oct.unstack(-2) #(reshape...)
+    df3['color_y'] = '-'
+    for i, y in enumerate(yrs):
+        df3.loc[df3['year'] == y, 'color_y'] = matplotlib.colors.to_hex(colors_yr[i])
+        df3.loc[df3['year'] == y, 'markers'] = markers[i]
+
+    # print(df3)
+    # print(df3.markers.unique())
+    source = ColumnDataSource(df3)
+    checkboxes = CheckboxGroup(labels=checks, active=[0, 21])#list(range(len(checks))))
+    checkbox_b = CheckboxButtonGroup(labels=yrs, active=list(range(len(yrs))))
+
+    fig = figure(plot_height=600, plot_width=720,
+                 x_axis_type='datetime', y_axis_label='Ablation (cm Eis)',
+               x_axis_label='Datum')
+
+    hover = HoverTool(tooltips=[("Datum", "@date{%F}")],
+                      formatters={"@date": "datetime"})
+    fig.add_tools(hover)
+
+    filter1 = CustomJSFilter(code="""
+    let selected = checkboxes.active.map(i=>checkboxes.labels[i]);
+    let indices = [];
+    let column = source.data['stake_id'];
+    for(let i=0; i<column.length; i++){
+        if(selected.includes(column[i])){
+            indices.push(i);
+            }
+        }
+    return indices;
+    """, args=dict(checkboxes=checkboxes))
+
+    filter2 = CustomJSFilter(code="""
+    let selected2 = checkbox_b.active.map(i=>checkbox_b.labels[i]);
+    let indices2 = [];
+    let column2 = source.data['year'];
+    for(let i=0; i<column2.length; i++){
+        if(selected2.includes(column2[i])){
+            indices2.push(i);
+            }
+        }
+    return indices2;
+    """, args=dict(checkbox_b=checkbox_b))
+
+    text = 'test'
+    citation = Label(x=70, y=70, x_units='screen', y_units='screen',
+                 text=text, render_mode='css', 
+                 border_line_color='black', border_line_alpha=1.0,
+                 background_fill_color='white', background_fill_alpha=1.0)
+
+    checkboxes.js_on_change("active", CustomJS(code="source.change.emit();", args=dict(source=source)))
+    checkbox_b.js_on_change("active", CustomJS(code="source.change.emit();", args=dict(source=source)))
+    
+
+    # # l1 = fig.scatter(x=70, y=70, x_units='screen', y_units='screen',
+    # #                 size=15, fill_color='red', marker='asterisk'
+    # #                 )
+    # args = []
+    # code = "active = cb_obj.active;"
+    # for i in range(len(yrs)):
+    #     glyph = fig.scatter(x=220, y=300, #x_units='screen', y_units='screen',
+    #                 size=15, fill_color='red', marker='asterisk')
+    #                 # fig.line(x,[random() for j in x],color=choice(Category20_20))
+    #     args += [('glyph'+str(i),glyph)]
+    #     code += "glyph{}.visible = active.includes({});".format(i,i)
+
+    # # checkbox = CheckboxGroup(labels=[str(i) for i in range(N_lines)],active=range(N_lines))
+
+    # checkbox_b.js_event_callbacks = CustomJS(args={key:value for key,value in args},code=code)
+
+
+    p = fig.scatter(x="dummydate", y="abl_since_oct", marker='markers', source=source, 
+                    view=CDSView(source=source, filters=[filter1, filter2]), size=10, fill_color='color', 
+                    line_color=None)#, legend_field='year')#legend_group="year")
+
+
+
+
+    # fig.add_layout(legend)
+
+    layout = row(column(checkbox_b, checkboxes), fig)#, sizing_mode="stretch_both")
+    return (layout)
 

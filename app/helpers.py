@@ -92,4 +92,46 @@ def sincedrilldate(stk):
     db.session.commit()
 
 
+def avgabl():
+    dat = Entry.query.all()
+    abl = [e.abl_since_oct for e in dat]
+    entrydate = [e.date for e in dat]
+    stake_id = [e.stake_id for e in dat]
 
+    abl_df = pd.DataFrame(
+            {'stk': stake_id,
+             'abl': abl,
+             }, index=entrydate)
+
+    df = pd.DataFrame(columns=abl_df.stk.unique())
+    for s in abl_df.stk.unique():
+        df[s] = abl_df.loc[abl_df.stk==s].resample('A')['abl'].agg(['max'])
+
+    print(abl_df.loc[abl_df.stk=='1'])
+    print(abl_df.loc[abl_df.stk=='1'].resample('A')['abl'].agg(['max']))
+    print(df)
+
+    dat2 = Stake.query.all()
+    stk = [s.stake_id for s in dat2]
+    d_date = [s.drilldate for s in dat2]
+    abl_since_drilled = [s.abl_since_drilled for s in dat2]
+
+    stk_df = pd.DataFrame(
+            {'stk': stk,
+             'ddate': d_date,
+             'abl_d': abl_since_drilled
+             })
+
+
+
+    # e_date = abl_df.index.max()
+
+    # abl_df = abl_df.loc[d_date:e_date]
+    # abl_df2 = abl_df.iloc[1:, :]
+    # abl_value = abl_df2['abl'].sum()
+    # # print('value: ', abl_value)
+
+    # u_stake = db.session.query(Stake).filter(Stake.stake_id == stk).one()
+    # u_stake.abl_since_drilled = abl_value
+
+    # db.session.commit()

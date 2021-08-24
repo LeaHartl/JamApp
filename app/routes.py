@@ -6,7 +6,6 @@ from flask_login import current_user, login_user, logout_user, login_required
 from app.models import User, Entry, Stake
 from werkzeug.urls import url_parse
 from sqlalchemy import desc, func, case, and_
-# from datetime import datetime
 import pandas as pd
 
 from bokeh.embed import components
@@ -16,8 +15,10 @@ import app.bokeh_embed as be
 import app.helpers as hlp
 
 
-@app.route('/plot', methods=['GET'])
-def plot():
+# 2018 Herbst ablesungen eingetragen bis inkl P 7
+
+@app.route('/plot1', methods=['GET'])
+def plot1():
     script, div = components(be.pointplot())
 
     return render_template(
@@ -28,10 +29,24 @@ def plot():
         css_resources=INLINE.render_css(),
         ).encode(encoding='UTF-8')
 
+@app.route('/plot2', methods=['GET'])
+def plot2():
+    script, div = components(be.pointplotbyyear())
+
+    return render_template(
+        'embed.html',
+        plot_script=script,
+        plot_div=div,
+        js_resources=INLINE.render_js(),
+        css_resources=INLINE.render_css(),
+        ).encode(encoding='UTF-8')
+
+
 
 @app.route('/')
 @app.route('/index')
 def index():
+    hlp.avgabl()
     script, div = components(be.mapplot())
 
     return render_template(
@@ -122,7 +137,6 @@ def getcsvstakes():
         headers={"Content-disposition":
                  "attachment; filename=Pegelblatt_P"+stk+".csv"})
     return redirect('/')
-
 
 
 @app.route('/new_entries', methods=['GET', 'POST'])

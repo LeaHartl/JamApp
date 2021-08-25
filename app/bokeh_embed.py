@@ -65,9 +65,9 @@ def getPolyCoords(row, geom, coord_type):
 
 def getsource():
     data = Entry.query.all()
-    outputdf = pd.DataFrame([(d.stake_id, d.date, d.FE, d.FE_new, d.comment,
+    outputdf = pd.DataFrame([(d.id, d.stake_id, d.date, d.FE, d.FE_new, d.comment,
                             d.abl_since_last, d.abl_since_oct) for d in data],
-                            columns=['stake_id', 'date', 'FE', 'FE_new', 'comment',
+                            columns=['id', 'stake_id', 'date', 'FE', 'FE_new', 'comment',
                             'abl_since_last', 'abl_since_oct'])
     return (outputdf)
 
@@ -154,7 +154,7 @@ def mapplot():
 def pointplot():
     df = getsource()
     df['color'] = ''
-
+    print(df)
     # works more or less but sorting does not do what i want it to.
     checks = df['stake_id'].drop_duplicates().sort_values().tolist()
     n = len(checks)
@@ -164,25 +164,26 @@ def pointplot():
         df.loc[df['stake_id'] == c, 'color'] = matplotlib.colors.to_hex(colors[i])
 
     source = ColumnDataSource(df)
-    checkboxes = CheckboxGroup(labels=checks, active=[0, 21])#list(range(len(checks))))
+    act=[0, 21]
+    checkboxes = CheckboxGroup(labels=checks, active=act)#list(range(len(checks))))
 
     lbls = pd.DataFrame(columns=['x', 'y', 'stake_id', 'color'])
     lbls.stake_id = checks
-    lbls.y = [70+v*8 for v in range(len(checks))]
-    lbls.x = 70
+    lbls['txt'] = ['P'+c for c in checks]
+    lbls.y = [500-v*10 for v in range(len(checks))]
+
+    lbls.x = 20
+
     for i, c in enumerate(checks):
         lbls.loc[lbls['stake_id'] == c, 'color'] = matplotlib.colors.to_hex(colors[i])
-    # lbls.color = colors
-    print(lbls)
-    lsource = ColumnDataSource(lbls)
-    labels = LabelSet(x='x', y='y', x_units='screen', y_units='screen',
-                      text='stake_id',
-                      source=lsource, render_mode='canvas', text_font_size='10pt',
-                      x_offset=2, y_offset=-18,
-                      background_fill_color='color', background_fill_alpha=0.6)
+
+
+    lsource = ColumnDataSource(lbls.iloc[act])
 
     fig = figure(plot_height=600, plot_width=720,
+                 x_axis_label='Datum', y_axis_label='Ablation (cm Eis)',
                  x_axis_type='datetime')
+
 
     hover = HoverTool(tooltips=[("Ablation seit Herbst (cm Eis)", "@abl_since_oct"), ("Datum", "@date{%F}"), ("Pegel", "@stake_id")],
                       formatters={"@date": "datetime"})
@@ -201,40 +202,71 @@ def pointplot():
 
     return indices;
     """, args=dict(checkboxes=checkboxes))
-    
-    # text='test'
 
+
+    code = """
+
+    let selected = checkboxes.active.map(i=>checkboxes.labels[i]);
+
+    var y = []
+    var x = []
+    var color = []
+    var ix = []
+    var id = []
+    var txt = []
+
+    for(let i=0;i<checks.length; i++){
+    //console.log(i)
+        if(selected.includes(checks[i])){
+            //console.log(selected.includes(checks[i]))
+            //console.log(checks[i])
+            //console.log(dx[i])
+
+                    //y.push(dy[i]);
+                    y.push(500-i*10);
+                    x.push(dx[i]);
+                    color.push(dc[i]);
+                    ix.push(di[i]);
+                    id.push(checks[i]);
+                    txt.push(dt[i]);
+                    //inds.push[i]
+            }
+
+    }
+
+
+    source.data['y']=y//.sort();
+    source.data['x']=x;
+    source.data['color']=color;
+    source.data['txt']=txt;
+    source.data.index=ix;
+    source.data['stake_id']=id;
+    //console.log(source.data)
+    source.change.emit();
+    """
 
     # use this if not trying to change label text.
     checkboxes.js_on_change("active", CustomJS(code="source.change.emit();", args=dict(source=source)))
-#
-#ADAPT HERE TO UPDATE LABELGROUP ON CLICK:::
-    # # sel_list = [0, 21]
-    # checkboxes.js_on_change("active", CustomJS(code=""" 
-    #     var inds = cb_obj.indices;
-    #     var selected2 = checkboxes.active.map(i=>checkboxes.labels[i]);
-    #     var column2 = source.data['stake_id'];
-    #     sel_list = selected2
-    #     //console.log(selected2, inds);
+    checkboxes.js_on_change("active", CustomJS(code=code, args=dict(source=lsource, 
+        checkboxes=checkboxes, checks=checks, dx=lbls['x'].values, dy=lbls['y'].values, 
+        dc=lbls['color'].values, dt=lbls['txt'].values, di=lbls.index.values)))
 
-    #     console.log(selected2);
-    #     labels.text = 'p'+selected2[0];
-    #     //citation.y = inds[0];
-    #     source.change.emit();
-    #     """,args=dict(source=source, citation=citation, checkboxes=checkboxes, sel_list=sel_list)))
-    # # print(sel_list)
-    # for v in sel_list:
-    #     citation = Label(x=70, y=70+v, x_units='screen', y_units='screen',
-    #                  text='p'+checks[v], render_mode='css',
-    #                  border_line_color='black', border_line_alpha=1.0,
-    #                  background_fill_color='white', background_fill_alpha=1.0)
-    #     print(citation.text)
-    #     fig.add_layout(citation)
+    # print(lsource.data)
+
+    labels = LabelSet(x='x', y='y', x_units='screen', y_units='screen',
+                      text='txt',
+                      source=lsource,
+                      render_mode='canvas', text_font_size='10pt',
+                      #x_offset=2, y_offset=-18,
+                      background_fill_color='color', background_fill_alpha=0.4)
 
     p = fig.circle(x="date", y="abl_since_oct", source=source,
                    view=CDSView(source=source, filters=[filter]),
-                   size=5, fill_color='color', line_color=None,)
+                   size=10, fill_color='color', line_color=None,)
                    #legend_group='stake_id')
+
+
+
 
     # fig.add_layout(legend)
     fig.add_layout(labels)
@@ -300,7 +332,7 @@ def pointplotbyyear():
 
     fig = figure(plot_height=600, plot_width=720,
                  x_axis_type='datetime', y_axis_label='Ablation (cm Eis)',
-               x_axis_label='Datum')
+                 x_axis_label='Datum')
 
     hover = HoverTool(tooltips=[("Datum", "@date{%F}")],
                       formatters={"@date": "datetime"})
@@ -340,31 +372,11 @@ def pointplotbyyear():
     checkbox_b.js_on_change("active", CustomJS(code="source.change.emit();", args=dict(source=source)))
     
 
-    # # l1 = fig.scatter(x=70, y=70, x_units='screen', y_units='screen',
-    # #                 size=15, fill_color='red', marker='asterisk'
-    # #                 )
-    # args = []
-    # code = "active = cb_obj.active;"
-    # for i in range(len(yrs)):
-    #     glyph = fig.scatter(x=220, y=300, #x_units='screen', y_units='screen',
-    #                 size=15, fill_color='red', marker='asterisk')
-    #                 # fig.line(x,[random() for j in x],color=choice(Category20_20))
-    #     args += [('glyph'+str(i),glyph)]
-    #     code += "glyph{}.visible = active.includes({});".format(i,i)
-
-    # # checkbox = CheckboxGroup(labels=[str(i) for i in range(N_lines)],active=range(N_lines))
-
-    # checkbox_b.js_event_callbacks = CustomJS(args={key:value for key,value in args},code=code)
-
-
     p = fig.scatter(x="dummydate", y="abl_since_oct", marker='markers', source=source, 
                     view=CDSView(source=source, filters=[filter1, filter2]), size=10, fill_color='color', 
                     line_color=None)#, legend_field='year')#legend_group="year")
 
 
-
-
-    # fig.add_layout(legend)
 
     layout = row(column(checkbox_b, checkboxes), fig)#, sizing_mode="stretch_both")
     return (layout)

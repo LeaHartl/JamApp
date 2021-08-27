@@ -7,6 +7,7 @@ from app.models import User, Entry, Stake
 from werkzeug.urls import url_parse
 from sqlalchemy import desc, func, case, and_
 import pandas as pd
+from datetime import datetime
 
 from bokeh.embed import components
 from bokeh.resources import INLINE
@@ -14,8 +15,6 @@ from bokeh.resources import INLINE
 import app.bokeh_embed as be
 import app.helpers as hlp
 
-
-# 2018 Herbst ablesungen eingetragen bis inkl P 7
 
 @app.route('/plot1', methods=['GET'])
 def plot1():
@@ -28,6 +27,7 @@ def plot1():
         js_resources=INLINE.render_js(),
         css_resources=INLINE.render_css(),
         ).encode(encoding='UTF-8')
+
 
 @app.route('/plot2', methods=['GET'])
 def plot2():
@@ -42,11 +42,10 @@ def plot2():
         ).encode(encoding='UTF-8')
 
 
-
 @app.route('/')
 @app.route('/index')
 def index():
-    hlp.avgabl()
+    #hlp.avgabl()
     script, div = components(be.mapplot())
 
     return render_template(
@@ -74,7 +73,7 @@ def lastentries():
     # outputdf['abl_since_drilled'] = [out.abl_since_drilled for out in output]
     outputdf['FE'] = [out.FE_new for out in output]
     outputdf['date'] = [out.date for out in output]
-    # outputdf['comment'] = [out.comment for out in output]
+    outputdf['comment'] = [out.comment for out in output]
 
     if not latest:
         flash('No results found!')
@@ -82,22 +81,18 @@ def lastentries():
     else:
         table = Results(output)
         table.border = True
-        return render_template('lastentries.html', table=table, output=outputdf)
+        return render_template('lastentries.html', table=table, output=outputdf.to_csv(index=False))
 
 
 @app.route('/getcsv')
 def getcsv():
-    print('hello')
     output = request.args.get('pass', None)
-    # print(output)
-    # print(type(output))
-    # cdv=pd.DataFrame(output)
-    # print(cdv)
+    # print('hello', output)
     return Response(
         output,
         mimetype="text/csv",
         headers={"Content-disposition":
-                 "attachment; filename=lastentries.csv"})
+                 "attachment; filename=download.csv"})
     return redirect('/')
 
 
@@ -108,17 +103,28 @@ def stakes():
     table.border = True
     for s in stk:
         hlp.sincedrilldate(s.stake_id)
-    # print(table.__html__())
-    return render_template('stakes.html', table=table)
+
+    output = [item for item in stk]
+    outputdf = pd.DataFrame(columns=['stake_id', 'Lon', 'Lat'])
+    outputdf['stake_id'] = [out.stake_id for out in output]
+    outputdf['Bohrdatum'] = [out.drilldate for out in output]
+    outputdf['Abl. seit Bohrdatum'] = [out.abl_since_drilled for out in output]
+    outputdf['Kommentar'] = [out.comment for out in output]
+    outputdf['Lon'] = [out.x for out in output]
+    outputdf['Lat'] = [out.y for out in output]
+    # print(outputdf)
+
+    return render_template('stakes.html', table=table, output=outputdf.to_csv(index=False))
 
 
 @app.route('/search_entries', methods=['GET', 'POST'])
 def search_entries():
     search = EntrySearchForm(request.form)
     if request.method == 'POST':
+        print('yes')
 
         return search_results(search)
-    # print(stk)
+    print(search)
 
     return render_template('search_entries.html', form=search)
 
@@ -131,6 +137,7 @@ def getcsvstakes():
                               d.abl_since_last, d.abl_since_oct) for d in data],
                             columns=['stake_id', 'date', 'FE', 'FE neu', 'Kommentar',
                             'Ablation seit letzter Messung', 'Abl. seit Herbst'])
+    outputdf.sort_values(by=['date'], inplace=True)
     return Response(
         outputdf.to_csv(),
         mimetype="text/csv",
@@ -253,6 +260,7 @@ def editEntry(id):
         return redirect(url_for('search_entries'))
     return render_template('edit_entry.html', form=form)
 
+
 @app.route('/stake/<int:id>', methods=['GET', 'POST'])
 @login_required
 def editStake(id):
@@ -327,6 +335,7 @@ def deleteStake(id):
     table.border = True
     return redirect(url_for('stakes'))
     return render_template('new_stake.html', title='Home Page', form=form)
+
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():

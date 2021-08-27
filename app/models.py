@@ -38,6 +38,10 @@ class Stake(db.Model):
     who = db.Column(db.String)
     abl_since_drilled = db.Column(db.Float)
 
+    # def __getitem__(self, key):
+    #     print("Inside `__getitem__` method!", self, key)
+    #     return self.__dict__[key]
+
 
 class Entry(db.Model):
     __tablename__ = 'entries'

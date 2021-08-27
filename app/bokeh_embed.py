@@ -139,6 +139,7 @@ def mapplot():
     # there is no built in function for a color bar label...
     color_bar = ColorBar(color_mapper=color_mapper, label_standoff=12)
     hover = HoverTool(tooltips=[('Pegel', '@stake_id'), ('Bohrdatum', '@drilldate{%F}'),
+                                #('Letzte Ablesung', '@drilldate{%F}')
                                 ('Ablation seit Bohrung', '@abl_since_drilled')],
                       formatters={"@drilldate": "datetime"}, renderers=[points])
     fig.add_tools(hover)
@@ -154,7 +155,7 @@ def mapplot():
 def pointplot():
     df = getsource()
     df['color'] = ''
-    print(df)
+    #print(df)
     # works more or less but sorting does not do what i want it to.
     checks = df['stake_id'].drop_duplicates().sort_values().tolist()
     n = len(checks)
@@ -258,7 +259,7 @@ def pointplot():
                       source=lsource,
                       render_mode='canvas', text_font_size='10pt',
                       #x_offset=2, y_offset=-18,
-                      background_fill_color='color', background_fill_alpha=0.4)
+                      background_fill_color='color', background_fill_alpha=0.7)
 
     p = fig.circle(x="date", y="abl_since_oct", source=source,
                    view=CDSView(source=source, filters=[filter]),
@@ -288,7 +289,7 @@ def pointplotbyyear():
 
     # markers = list(MarkerType)
     # markers = markers[0:len(yrs)+1]
-    markers = ['diamond', 'square', 'circle', 'triangle']
+    markers = ['diamond','square', 'circle', 'triangle']
 
     for i, c in enumerate(checks):
         df.loc[df['stake_id'] == c, 'color'] = matplotlib.colors.to_hex(colors[i])
@@ -324,11 +325,10 @@ def pointplotbyyear():
         df3.loc[df3['year'] == y, 'color_y'] = matplotlib.colors.to_hex(colors_yr[i])
         df3.loc[df3['year'] == y, 'markers'] = markers[i]
 
-    # print(df3)
-    # print(df3.markers.unique())
+
     source = ColumnDataSource(df3)
     checkboxes = CheckboxGroup(labels=checks, active=[0, 21])#list(range(len(checks))))
-    checkbox_b = CheckboxButtonGroup(labels=yrs, active=list(range(len(yrs))))
+    checkbox_b = CheckboxButtonGroup(labels=yrs[1:], active=list(range(len(yrs))))
 
     fig = figure(plot_height=600, plot_width=720,
                  x_axis_type='datetime', y_axis_label='Ablation (cm Eis)',
@@ -374,9 +374,97 @@ def pointplotbyyear():
 
     p = fig.scatter(x="dummydate", y="abl_since_oct", marker='markers', source=source, 
                     view=CDSView(source=source, filters=[filter1, filter2]), size=10, fill_color='color', 
-                    line_color=None)#, legend_field='year')#legend_group="year")
+                    line_color='black')#, legend_field='year')#legend_group="year")
+
+    dummydata = pd.DataFrame(columns=['xdata', 'ydata', 'markers', 'label'])
+    dummydata['label'] = yrs[1:]
+    dummydata['markers'] = markers[1:]
+    dummydata['xdata'] = [pd.to_datetime('2020-09-15'), pd.to_datetime('2020-09-25'), pd.to_datetime('2020-10-05')] 
+    dummydata['ydata'] = [20, 20, 20] 
 
 
+    p2 = fig.scatter(x="xdata", y="ydata", marker='markers', source=ColumnDataSource(dummydata),
+                    size=10, fill_color='white', 
+                    line_color='black')
+    labels2 = LabelSet(x='xdata', y='ydata', x_units='data', y_units='data',
+                      text='label',
+                      source=ColumnDataSource(dummydata),
+                      x_offset=-38, y_offset=-7,
+                      render_mode='canvas', text_font_size='10pt',)
+                      # background_fill_color='color', background_fill_alpha=0.4)
+    fig.add_layout(labels2)
+
+
+    act=[0, 21]
+    lbls = pd.DataFrame(columns=['x', 'y', 'stake_id', 'color'])
+    lbls.stake_id = checks
+    lbls['txt'] = ['P'+c for c in checks]
+    lbls.y = [500-v*10 for v in range(len(checks))]
+
+    lbls.x = 20
+
+    for i, c in enumerate(checks):
+        lbls.loc[lbls['stake_id'] == c, 'color'] = matplotlib.colors.to_hex(colors[i])
+
+
+    lsource = ColumnDataSource(lbls.iloc[act])
+
+    code = """
+
+    let selected = checkboxes.active.map(i=>checkboxes.labels[i]);
+
+    var y = []
+    var x = []
+    var color = []
+    var ix = []
+    var id = []
+    var txt = []
+
+    for(let i=0;i<checks.length; i++){
+    //console.log(i)
+        if(selected.includes(checks[i])){
+            //console.log(selected.includes(checks[i]))
+            //console.log(checks[i])
+            //console.log(dx[i])
+
+                    //y.push(dy[i]);
+                    y.push(500-i*10);
+                    x.push(dx[i]);
+                    color.push(dc[i]);
+                    ix.push(di[i]);
+                    id.push(checks[i]);
+                    txt.push(dt[i]);
+                    //inds.push[i]
+            }
+
+    }
+
+
+    source.data['y']=y//.sort();
+    source.data['x']=x;
+    source.data['color']=color;
+    source.data['txt']=txt;
+    source.data.index=ix;
+    source.data['stake_id']=id;
+    //console.log(source.data)
+    source.change.emit();
+    """
+
+    checkboxes.js_on_change("active", CustomJS(code=code, args=dict(source=lsource, 
+        checkboxes=checkboxes, checks=checks, dx=lbls['x'].values, dy=lbls['y'].values, 
+        dc=lbls['color'].values, dt=lbls['txt'].values, di=lbls.index.values)))
+
+    # print(lsource.data)
+
+    labels = LabelSet(x='x', y='y', x_units='screen', y_units='screen',
+                      text='txt',
+                      source=lsource,
+                      render_mode='canvas', text_font_size='10pt',
+                      #x_offset=2, y_offset=-18,
+                      background_fill_color='color', background_fill_alpha=0.7)
+
+
+    fig.add_layout(labels)
 
     layout = row(column(checkbox_b, checkboxes), fig)#, sizing_mode="stretch_both")
     return (layout)

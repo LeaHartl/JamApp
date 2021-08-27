@@ -80,6 +80,14 @@ def sincedrilldate(stk):
     d_d = Stake.query.filter(Stake.stake_id == stk).first()
     d_date = d_d.drilldate
     e_date = abl_df.index.max()
+    # print(e_date)
+    # print(type(e_date))
+    # check for cases where no entries (no last entry date) exist and set entry date to drill date.
+    if not isinstance(e_date, pd.Timestamp):
+        e_date=d_date
+        print('hello',e_date)
+
+    # print(d_date)
 
     abl_df = abl_df.loc[d_date:e_date]
     abl_df2 = abl_df.iloc[1:, :]

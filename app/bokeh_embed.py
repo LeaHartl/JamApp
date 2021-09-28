@@ -171,7 +171,7 @@ def mapplot2():
     entr = Entry.query.all()
     abl_since_fall = []
     lastentry = []
-    df = pd.DataFrame(columns=['xc', 'yc', 'stake_id', 'abl_since_fall', 'lastentry'])
+    df = pd.DataFrame(columns=['xc', 'yc', 'stake_id'])
 
     for s in stk:
         xc.append(s.x)
@@ -298,7 +298,7 @@ def mapplot2():
     tab2 = Panel(child=fig2, title="2021")
 #--------------------------------------
     tabs = Tabs(tabs=[tab0, tab1, tab2])
-    return(tabs)
+    return(tabs, gdf)
 
 def pointplot():
     df = getsource()
@@ -306,6 +306,7 @@ def pointplot():
     #print(df)
     # works more or less but sorting does not do what i want it to.
     checks = df['stake_id'].drop_duplicates().sort_values().tolist()
+    checks.remove('15unten_2017')
     n = len(checks)
     colors = pl.cm.nipy_spectral(np.linspace(0, 1, n))
 
@@ -429,6 +430,7 @@ def pointplotbyyear():
 
     # works more or less but sorting does not do what i want it to.
     checks = df['stake_id'].drop_duplicates().sort_values().tolist()
+    checks.remove('15unten_2017')
     yrs = df['date'].dt.year.drop_duplicates().sort_values().astype(str).tolist()
     print(min(yrs))
     n = len(checks)

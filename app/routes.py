@@ -61,16 +61,33 @@ def index():
 @app.route('/ablationmap')
 def ablationmap():
     #hlp.avgabl()
-    script, div = components(be.mapplot2())
-
+    tabs, df = be.mapplot2()
+    script, div = components(tabs)
+    # print('hello', df)
+    df = df[['stake_id', 'abl_since_oct_2019', 'abl_since_oct_2020', 'abl_since_oct_2021',
+             'lastentry_2019', 'lastentry_2020', 'lastentry_2021', 'x', 'y', 'xc', 'yc']]
+    df.rename(columns={'abl_since_oct_2019': 'ablation2019', 'abl_since_oct_2020': 'ablation2019',
+                       'abl_since_oct_2021': 'ablation2021'}, inplace=True)
     return render_template(
         'ablationmap.html',
         plot_script=script,
         plot_div=div,
         js_resources=INLINE.render_js(),
         css_resources=INLINE.render_css(),
+        outputdata=df.to_csv(index=False)
         ).encode(encoding='UTF-8')
-    return render_template('ablationmap.html', title='Home')  
+
+
+
+@app.route('/getcsvablation')
+def getcsvablation():
+    output = request.args.get('pass', None)
+    return Response(
+        output,
+        mimetype="text/csv",
+        headers={"Content-disposition":
+                 "attachment; filename=ablation.csv"})
+    return redirect('/')
 
 
 @app.route('/lastentries')
@@ -115,16 +132,6 @@ def getcsv():
                  "attachment; filename=download.csv"})
     return redirect('/')
 
-# @app.route('/getpdf')
-# def getpdf():
-#     output = request.args.get('pass', None)
-#     print('hello')
-#     return Response(
-#         output,
-#         mimetype="text/csv",
-#         headers={"Content-disposition":
-#                  "attachment; filename=download."})
-#     return redirect('/')
 
 
 @app.route('/stakes')

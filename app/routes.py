@@ -45,7 +45,7 @@ def plot2():
 @app.route('/')
 @app.route('/index')
 def index():
-    #hlp.avgabl()
+    
     script, div = components(be.mapplot())
 
     return render_template(
@@ -56,6 +56,21 @@ def index():
         css_resources=INLINE.render_css(),
         ).encode(encoding='UTF-8')
     return render_template('index.html', title='Home')  
+
+
+@app.route('/ablationmap')
+def ablationmap():
+    #hlp.avgabl()
+    script, div = components(be.mapplot2())
+
+    return render_template(
+        'ablationmap.html',
+        plot_script=script,
+        plot_div=div,
+        js_resources=INLINE.render_js(),
+        css_resources=INLINE.render_css(),
+        ).encode(encoding='UTF-8')
+    return render_template('ablationmap.html', title='Home')  
 
 
 @app.route('/lastentries')
@@ -81,7 +96,12 @@ def lastentries():
     else:
         table = Results(output)
         table.border = True
-        return render_template('lastentries.html', table=table, output=outputdf.to_csv(index=False))
+        #print(outputdf.to_markdown())
+
+        # forPrint = outputdf.to_()
+        print(outputdf.to_markdown())
+        return render_template('lastentries.html', table=table,
+            output=outputdf.to_csv(index=False))#, output2=outputdf.to_markdown())
 
 
 @app.route('/getcsv')
@@ -94,6 +114,17 @@ def getcsv():
         headers={"Content-disposition":
                  "attachment; filename=download.csv"})
     return redirect('/')
+
+# @app.route('/getpdf')
+# def getpdf():
+#     output = request.args.get('pass', None)
+#     print('hello')
+#     return Response(
+#         output,
+#         mimetype="text/csv",
+#         headers={"Content-disposition":
+#                  "attachment; filename=download."})
+#     return redirect('/')
 
 
 @app.route('/stakes')
@@ -375,3 +406,34 @@ def register():
         flash('Congratulations, you are now a registered user!')
         return redirect(url_for('login'))
     return render_template('register.html', title='Register', form=form)
+
+
+@app.route('/reset_password_request', methods=['GET', 'POST'])
+def reset_password_request():
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+    form = ResetPasswordRequestForm()
+    if form.validate_on_submit():
+        user = User.query.filter_by(email=form.email.data).first()
+        if user:
+            send_password_reset_email(user)
+        flash('Check your email for the instructions to reset your password')
+        return redirect(url_for('login'))
+    return render_template('reset_password_request.html',
+                           title='Reset Password', form=form)
+
+
+@app.route('/reset_password/<token>', methods=['GET', 'POST'])
+def reset_password(token):
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+    user = User.verify_reset_password_token(token)
+    if not user:
+        return redirect(url_for('index'))
+    form = ResetPasswordForm()
+    if form.validate_on_submit():
+        user.set_password(form.password.data)
+        db.session.commit()
+        flash('Your password has been reset.')
+        return redirect(url_for('login'))
+    return render_template('reset_password.html', form=form)

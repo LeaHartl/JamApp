@@ -1,5 +1,5 @@
 from bokeh.plotting import figure, show, output_notebook
-from bokeh.models import Scatter, Legend, LegendItem, CheckboxGroup, CheckboxButtonGroup, CustomJS, ColumnDataSource, CDSView, HoverTool, Label, LabelSet, LinearColorMapper, ColorBar
+from bokeh.models import Scatter, Legend, Panel, Tabs, LegendItem, CheckboxGroup, CheckboxButtonGroup, CustomJS, ColumnDataSource, CDSView, HoverTool, Label, LabelSet, LinearColorMapper, ColorBar
 from bokeh.models.filters import CustomJSFilter
 from bokeh.layouts import row, column
 from bokeh.transform import factor_cmap
@@ -74,7 +74,7 @@ def getsource():
 
 def mapplot():
     # File path glacier boundary
-    bound_fp = '/Users/leahartl/Desktop/Jam2021/App3/Jamtalferner_GI5.shp'
+    bound_fp = '/Users/leahartl/Desktop/Jam2021/App3/static/Jamtalferner_GI5.shp'
     bound = gpd.read_file(bound_fp).explode()
 
     df_bound = pd.DataFrame(columns=['x', 'y'])
@@ -151,6 +151,154 @@ def mapplot():
 
     return(layout)
 
+def mapplot2():
+    # File path glacier boundary
+    bound_fp = '/Users/leahartl/Desktop/Jam2021/App3/static/Jamtalferner_GI5.shp'
+    bound = gpd.read_file(bound_fp).explode()
+
+    df_bound = pd.DataFrame(columns=['x', 'y'])
+
+    df_bound['x'] = bound.apply(getPolyCoords, geom='geometry', coord_type='x', axis=1)
+    df_bound['y'] = bound.apply(getPolyCoords, geom='geometry', coord_type='y', axis=1)
+    bsource = ColumnDataSource(df_bound)
+
+    # get stake locations
+    stk = Stake.query.all()
+    xc = []
+    yc = []
+    stake_id = []
+    # get entries
+    entr = Entry.query.all()
+    abl_since_fall = []
+    lastentry = []
+    df = pd.DataFrame(columns=['xc', 'yc', 'stake_id', 'abl_since_fall', 'lastentry'])
+
+    for s in stk:
+        xc.append(s.x)
+        yc.append(s.y)
+        stake_id.append(s.stake_id)
+        # abl_since_drilled.append(s.abl_since_drilled)
+        # drilldate.append(s.drilldate)
+
+    df['xc'] = xc
+    df['yc'] = yc
+    df['stake_id'] = stake_id
+    # df['abl_since_drilled'] = abl_since_drilled
+    # df['drilldate'] = drilldate
+
+    data = pd.DataFrame(index=df['stake_id'].values, columns=[2018, 2019, 2020, 2021])
+    data2 = pd.DataFrame(index=df['stake_id'].values, columns=[2018, 2019, 2020, 2021])
+
+    for i in df['stake_id'].values:
+        tmp = pd.DataFrame(columns=['abl_since_fall', 'entry_dates'])
+        tmp.abl_since_fall = [e.abl_since_oct for e in Entry.query.filter(Entry.stake_id == i).order_by(Entry.date).all()]
+        tmp.entry_dates = [e.date for e in Entry.query.filter(Entry.stake_id == i).order_by(Entry.date).all()]
+        # print(i, tmp)
+        tmp2 = tmp.groupby(tmp['entry_dates'].dt.year)['abl_since_fall'].agg(['max'])
+        tmp3 = tmp.groupby(tmp['entry_dates'].dt.year)['entry_dates'].agg(['max'])
+        # print(i, tmp.groupby(tmp['entry_dates'].dt.year)['abl_since_fall'].agg(['max']))
+        data.loc[i, tmp2.index] = tmp2['max']
+        data2.loc[i, tmp2.index] = tmp3['max']
+    # print(data, data2)    
+
+    gdf = gpd.GeoDataFrame(df, geometry=gpd.points_from_xy(df.xc, df.yc))
+    gdf.crs = 'EPSG:4326'
+
+    CRS = bound.crs
+
+    gdf['geometry'] = gdf['geometry'].to_crs(crs=CRS)
+
+    gdf['abl_since_oct_2019'] = data.loc[:, 2019].values
+    gdf['abl_since_oct_2020'] = data.loc[:, 2020].values
+    gdf['abl_since_oct_2021'] = data.loc[:, 2021].values
+
+    gdf['lastentry_2019'] = data2.loc[:, 2019].values
+    gdf['lastentry_2020'] = data2.loc[:, 2020].values
+    gdf['lastentry_2021'] = data2.loc[:, 2021].values
+
+
+    # p_df = pd.DataFrame(columns=['x', 'y', 'stake_id'])
+    gdf['x'] = gdf.apply(getPolyCoords, geom='geometry', coord_type='x', axis=1)
+    gdf['y'] = gdf.apply(getPolyCoords, geom='geometry', coord_type='y', axis=1)
+
+    gdf['x'] = [v[0] for v in gdf['x'].values]
+    gdf['y'] = [v[0] for v in gdf['y'].values]
+
+    # print(gdf)
+
+    # Make a copy, drop the geometry column and create ColumnDataSource
+    p_df = gdf.drop('geometry', axis=1).copy()
+    psource = ColumnDataSource(p_df)
+    
+    
+    yrs = ['2018', '2019', '2020', '2021']
+    # checkboxes = CheckboxButtonGroup(labels=yrs[1:], active=[2])
+    # dropdown = Dropdown(label="Select year", button_type="default", menu=yrs[1:])
+
+    fig1 = figure(title="Ablation seit Herbst, 2020", plot_width=800, plot_height=600)
+    # Plot boundary
+    glacier = fig1.patches('x', 'y', source=bsource,
+                fill_alpha=0, line_color="black", line_width=1)
+    # Plot points
+    color_mapper = LinearColorMapper(palette='Magma256', low=0, high=700)
+    points = fig1.circle('x', 'y', source=psource, color={'field': 'abl_since_oct_2020', 'transform': color_mapper}, size=8)
+
+    labels = LabelSet(x='x', y='y', text='stake_id',
+                      source=psource, render_mode='canvas', text_font_size='10pt',
+                      x_offset=2, y_offset=-18,
+                      background_fill_color='white', background_fill_alpha=0.6)
+
+    # there is no built in function for a color bar label...
+    color_bar = ColorBar(color_mapper=color_mapper, label_standoff=12)
+    hover = HoverTool(tooltips=[('Pegel', '@stake_id'), ('Letzte Ablesung', '@lastentry_2020{%F}'),
+                                #('Letzte Ablesung', '@drilldate{%F}')
+                                ('Ablation seit Herbst', '@abl_since_oct_2020')],
+                      formatters={"@lastentry_2020": "datetime"}, renderers=[points])
+    fig1.add_tools(hover)
+
+    fig1.add_layout(color_bar, 'right')
+    fig1.add_layout(labels)
+
+    tab1 = Panel(child=fig1, title="2020")
+#--------------------------------------
+    fig0 = figure(title="Ablation seit Herbst, 2019", plot_width=800, plot_height=600)
+    # Plot boundary
+    glacier = fig0.patches('x', 'y', source=bsource,
+                fill_alpha=0, line_color="black", line_width=1)
+    # Plot points
+
+    points0 = fig0.circle('x', 'y', source=psource, color={'field': 'abl_since_oct_2019', 'transform': color_mapper}, size=8)
+    hover0 = HoverTool(tooltips=[('Pegel', '@stake_id'), ('Letzte Ablesung', '@lastentry_2019{%F}'),
+                                #('Letzte Ablesung', '@drilldate{%F}')
+                                ('Ablation seit Herbst', '@abl_since_oct_2019')],
+                      formatters={"@lastentry_2019": "datetime"}, renderers=[points0])
+    fig0.add_tools(hover0)
+
+    fig0.add_layout(color_bar, 'right')
+    fig0.add_layout(labels)
+
+    tab0 = Panel(child=fig0, title="2019")
+#--------------------------------------
+    fig2 = figure(title="Ablation seit Herbst, 2021", plot_width=800, plot_height=600)
+    # Plot boundary
+    glacier = fig2.patches('x', 'y', source=bsource,
+                fill_alpha=0, line_color="black", line_width=1)
+    # Plot points
+
+    points2 = fig2.circle('x', 'y', source=psource, color={'field': 'abl_since_oct_2021', 'transform': color_mapper}, size=8)
+    hover2 = HoverTool(tooltips=[('Pegel', '@stake_id'), ('Letzte Ablesung', '@lastentry_2021{%F}'),
+                                #('Letzte Ablesung', '@drilldate{%F}')
+                                ('Ablation seit Herbst', '@abl_since_oct_2021')],
+                      formatters={"@lastentry_2021": "datetime"}, renderers=[points2])
+    fig2.add_tools(hover2)
+
+    fig2.add_layout(color_bar, 'right')
+    fig2.add_layout(labels)
+
+    tab2 = Panel(child=fig2, title="2021")
+#--------------------------------------
+    tabs = Tabs(tabs=[tab0, tab1, tab2])
+    return(tabs)
 
 def pointplot():
     df = getsource()
@@ -259,7 +407,7 @@ def pointplot():
                       source=lsource,
                       render_mode='canvas', text_font_size='10pt',
                       #x_offset=2, y_offset=-18,
-                      background_fill_color='color', background_fill_alpha=0.7)
+                      background_fill_color='color', background_fill_alpha=0.5)
 
     p = fig.circle(x="date", y="abl_since_oct", source=source,
                    view=CDSView(source=source, filters=[filter]),
@@ -461,7 +609,7 @@ def pointplotbyyear():
                       source=lsource,
                       render_mode='canvas', text_font_size='10pt',
                       #x_offset=2, y_offset=-18,
-                      background_fill_color='color', background_fill_alpha=0.7)
+                      background_fill_color='color', background_fill_alpha=0.5)
 
 
     fig.add_layout(labels)

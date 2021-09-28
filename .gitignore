@@ -3,4 +3,7 @@
 make.txt
 venv/
 migrations/
-Jamtalferner_GI5*
+#Jamtalferner_GI5*
+boot.sh
+Dockerfile
+*.csv
